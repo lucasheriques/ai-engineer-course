@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 from telegram import Update
@@ -87,6 +88,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             args = json.loads(tool_call.function.arguments)
             response = run_function(name, args)
             print(tool_calls)
+            print(response)
             messages.append(
                 {
                     "tool_call_id": tool_call.id,
@@ -96,6 +98,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 }
             )
             if name == "svg_to_png_bytes":
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id, photo=response
+                )
+            if name == "generate_image":
                 await context.bot.send_photo(
                     chat_id=update.effective_chat.id, photo=response
                 )
@@ -125,23 +131,16 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# OLD CHAT FUNCTION WITH NO FUNCTION CALLING
-# async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     # Append the user's message to the message history.
-#     messages.append({"role": "user", "content": update.message.text})
-#     # Generate a response from the OpenAI API using the accumulated messages.
-#     completion = openai.chat.completions.create(
-#         model="gpt-3.5-turbo", messages=messages
-#     )
-#     # Extract the response content from the API's response.
-#     completion_answer = completion.choices[0].message
-#     # Append the AI's response to the message history.
-#     messages.append(completion_answer)
-#
-#     # Send the response back to the user on Telegram.
-#     await context.bot.send_message(
-#         chat_id=update.effective_chat.id, text=completion_answer.content
-#     )
+# main.py
+async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    response = openai.images.generate(
+        prompt=update.message.text, model="dall-e-3", n=1, size="1024x1024"
+    )
+    image_url = response.data[0].url
+    image_response = requests.get(image_url)
+    await context.bot.send_photo(
+        chat_id=update.effective_chat.id, photo=image_response.content
+    )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -157,10 +156,12 @@ if __name__ == "__main__":
 
     # Define command handlers for starting the bot and chatting.
     start_handler = CommandHandler("start", start)
+    image_handler = CommandHandler("image", image)
     chat_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), chat)
 
     # Add command handlers to the application.
     application.add_handler(start_handler)
+    application.add_handler(image_handler)
     application.add_handler(chat_handler)
 
     # Start the bot and poll for new messages.

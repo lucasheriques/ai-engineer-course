@@ -1,4 +1,10 @@
+import os
+
+import requests
 from cairosvg import svg2png
+from openai import OpenAI
+
+openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def svg_to_png_bytes(svg_string):
@@ -16,11 +22,23 @@ def python_math_execution(math_string):
         return "invalid code generated"
 
 
+def generate_image(prompt: str):
+    response = openai.images.generate(
+        prompt=prompt, model="dall-e-3", n=1, size="1024x1024"
+    )
+    image_url = response.data[0].url
+    image_response = requests.get(image_url)
+    # print debug image_response
+    return image_response.content
+
+
 def run_function(name: str, args: dict):
     if name == "svg_to_png_bytes":
         return svg_to_png_bytes(args["svg_string"])
     elif name == "python_math_execution":
         return python_math_execution(args["math_string"])
+    elif name == "generate_image":
+        return generate_image(args["prompt"])
     else:
         return None
 
@@ -57,6 +75,23 @@ functions = [
                     },
                 },
                 "required": ["math_string"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_image",
+            "description": "Generate an image from a prompt",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "A prompt to generate an image from",
+                    },
+                },
+                "required": ["prompt"],
             },
         },
     },
